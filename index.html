@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Prism Arcade — 3-in-1 Neon Game Hub</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #070812;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #f8fafc;
+    }
+    #app-root { position: relative; width: 100%; height: 100%; overflow: hidden; }
+    #game-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    .glass-panel {
+      background: rgba(12, 14, 28, 0.86);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+    }
+    .phase-solar-badge {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(236, 72, 153, 0.25));
+      border: 1px solid rgba(251, 191, 36, 0.7); color: #fde68a;
+    }
+    .phase-void-badge {
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(139, 92, 246, 0.25));
+      border: 1px solid rgba(34, 211, 238, 0.7); color: #a5f3fc;
+    }
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+  </style>
+</head>
+<body>
+  <div id="app-root">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- In-Game HUD -->
+    <header id="hud" class="pointer-events-none fixed top-0 left-0 right-0 z-20 hidden items-center justify-between gap-2 px-3 py-2.5 sm:px-5 sm:py-3">
+      <div class="pointer-events-auto flex items-center gap-2">
+        <button id="btn-back-hub" type="button" title="Back to Arcade Hub"
+          class="glass-panel rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-200 hover:bg-white/10 transition cursor-pointer">
+          ◀ Hub
+        </button>
+        <div class="glass-panel rounded-xl px-3 py-1.5 flex items-center gap-3">
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Score</div>
+            <div id="hud-score" class="text-base sm:text-xl font-extrabold tabular-nums leading-tight">0</div>
+          </div>
+          <div class="h-6 w-px bg-white/10"></div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Best</div>
+            <div id="hud-best" class="text-sm sm:text-base font-bold text-amber-300 tabular-nums leading-tight">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pointer-events-auto flex items-center gap-2">
+        <button id="btn-phase-hud" type="button" class="phase-solar-badge rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold cursor-pointer hidden">
+          SOLAR
+        </button>
+        <div id="hud-shields" class="glass-panel rounded-xl px-2.5 py-1.5 flex items-center gap-1"></div>
+        <button id="btn-mute" type="button" title="Sound"
+          class="glass-panel rounded-xl p-2 text-slate-200 hover:bg-white/10 transition cursor-pointer">
+          <span id="mute-label" class="text-xs font-bold">🔊</span>
+        </button>
+        <button id="btn-pause" type="button" title="Pause"
+          class="glass-panel rounded-xl p-2 text-slate-200 hover:bg-white/10 transition cursor-pointer">
+          <span class="text-xs font-bold">⏸</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Touch Controls for Prism Paradox -->
+    <div id="touch-controls-paradox" class="pointer-events-none fixed bottom-3 left-0 right-0 z-20 hidden justify-between items-end px-3 sm:px-6 gap-3">
+      <button id="btn-tether-touch" type="button"
+        class="pointer-events-auto glass-panel flex-1 max-w-[200px] py-3.5 px-4 rounded-2xl border border-white/20 text-center cursor-pointer active:scale-95 transition">
+        <div class="text-xs sm:text-sm font-extrabold text-white">HOLD: ORBIT</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Space / Left Side</div>
+      </button>
+      <button id="btn-phase-touch" type="button"
+        class="pointer-events-auto glass-panel flex-1 max-w-[200px] py-3.5 px-4 rounded-2xl border border-cyan-400/35 text-center cursor-pointer active:scale-95 transition">
+        <div class="text-xs sm:text-sm font-extrabold text-cyan-200">TAP: PHASE FLIP</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Shift / Right Side</div>
+      </button>
+    </div>
+
+    <!-- Touch Controls for Neon Dodge -->
+    <div id="touch-controls-dodge" class="pointer-events-none fixed bottom-3 left-0 right-0 z-20 hidden justify-between items-end px-3 sm:px-6 gap-3">
+      <button id="btn-dodge-left" type="button"
+        class="pointer-events-auto glass-panel flex-1 max-w-[200px] py-4 px-4 rounded-2xl border border-cyan-400/30 text-center cursor-pointer active:scale-95 transition">
+        <div class="text-sm font-extrabold text-cyan-200">◀ LEFT</div>
+      </button>
+      <button id="btn-dodge-right" type="button"
+        class="pointer-events-auto glass-panel flex-1 max-w-[200px] py-4 px-4 rounded-2xl border border-pink-400/30 text-center cursor-pointer active:scale-95 transition">
+        <div class="text-sm font-extrabold text-pink-200">RIGHT ▶</div>
+      </button>
+    </div>
+
+    <!-- Arcade Hub (Home Screen) -->
+    <div id="overlay-hub" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-sm overflow-y-auto">
+      <div class="w-full max-w-lg my-auto">
+        <div class="flex items-center justify-between mb-3 px-1">
+          <div>
+            <div class="text-[11px] uppercase tracking-widest text-amber-300 font-bold">✦ 3-IN-1 NEON ARCADE</div>
+            <h1 class="text-2xl sm:text-3xl font-black bg-gradient-to-r from-amber-300 via-pink-400 to-cyan-300 bg-clip-text text-transparent">
+              PRISM ARCADE
+            </h1>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="glass-panel rounded-xl px-3 py-1.5 text-right">
+              <div class="text-[10px] uppercase text-slate-400 font-semibold">Prism Coins</div>
+              <div id="hub-coins" class="text-sm sm:text-base font-black text-amber-300 tabular-nums">0 ◈</div>
+            </div>
+            <button id="btn-hub-mute" type="button"
+              class="glass-panel rounded-xl p-2.5 text-sm font-bold cursor-pointer hover:bg-white/10 transition">
+              🔊
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-3">
+          <!-- Game 1 Card -->
+          <div class="glass-panel rounded-2xl p-4 border border-amber-400/30 flex items-center justify-between gap-3 hover:border-amber-400/60 transition">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-extrabold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300">GAME 1</span>
+                <span class="text-[11px] text-slate-400 font-semibold">Best: <strong id="best-paradox" class="text-white">0</strong></span>
+              </div>
+              <h2 class="text-lg font-extrabold text-white mt-1">Prism Paradox</h2>
+              <p class="text-xs text-slate-300 mt-0.5">Orbit stars, slingshot upward, &amp; flip Solar/Void dimensions!</p>
+            </div>
+            <button id="btn-play-paradox" type="button"
+              class="shrink-0 px-5 py-3 rounded-xl font-extrabold text-xs sm:text-sm text-slate-950 bg-gradient-to-r from-amber-300 to-pink-400 hover:brightness-110 active:scale-95 transition cursor-pointer">
+              PLAY
+            </button>
+          </div>
+
+          <!-- Game 2 Card -->
+          <div class="glass-panel rounded-2xl p-4 border border-cyan-400/30 flex items-center justify-between gap-3 hover:border-cyan-400/60 transition">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-extrabold px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300">GAME 2</span>
+                <span class="text-[11px] text-slate-400 font-semibold">Best: <strong id="best-dodge" class="text-white">0</strong></span>
+              </div>
+              <h2 class="text-lg font-extrabold text-white mt-1">Neon Laser Rush</h2>
+              <p class="text-xs text-slate-300 mt-0.5">High-speed 5-lane jet dodge with lasers, coins &amp; shields!</p>
+            </div>
+            <button id="btn-play-dodge" type="button"
+              class="shrink-0 px-5 py-3 rounded-xl font-extrabold text-xs sm:text-sm text-slate-950 bg-gradient-to-r from-cyan-300 to-blue-400 hover:brightness-110 active:scale-95 transition cursor-pointer">
+              PLAY
+            </button>
+          </div>
+
+          <!-- Game 3 Card -->
+          <div class="glass-panel rounded-2xl p-4 border border-pink-400/30 flex items-center justify-between gap-3 hover:border-pink-400/60 transition">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-extrabold px-2 py-0.5 rounded-full bg-pink-400/20 text-pink-300">GAME 3</span>
+                <span class="text-[11px] text-slate-400 font-semibold">Best: <strong id="best-breaker" class="text-white">0</strong></span>
+              </div>
+              <h2 class="text-lg font-extrabold text-white mt-1">Orbit Breaker</h2>
+              <p class="text-xs text-slate-300 mt-0.5">Smash neon brick waves with multi-ball &amp; wide-paddle boosts!</p>
+            </div>
+            <button id="btn-play-breaker" type="button"
+              class="shrink-0 px-5 py-3 rounded-xl font-extrabold text-xs sm:text-sm text-slate-950 bg-gradient-to-r from-pink-400 to-purple-400 hover:brightness-110 active:scale-95 transition cursor-pointer">
+              PLAY
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause Overlay -->
+    <div id="overlay-pause" class="fixed inset-0 z-30 hidden items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+      <div class="glass-panel w-full max-w-xs rounded-3xl p-6 text-center shadow-2xl border border-white/15">
+        <h2 class="text-2xl font-extrabold text-white">Paused</h2>
+        <div class="mt-5 flex flex-col gap-2.5">
+          <button id="btn-resume" type="button"
+            class="w-full py-3 rounded-xl font-bold text-slate-950 bg-gradient-to-r from-amber-300 to-cyan-300 cursor-pointer">
+            Resume
+          </button>
+          <button id="btn-restart-pause" type="button"
+            class="w-full py-2.5 rounded-xl font-semibold text-sm text-slate-200 bg-white/10 cursor-pointer">
+            Restart Game
+          </button>
+          <button id="btn-hub-pause" type="button"
+            class="w-full py-2.5 rounded-xl font-semibold text-sm text-slate-300 bg-white/5 cursor-pointer">
+            Back to Arcade Hub
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rewarded Ad Preview Modal -->
+    <div id="overlay-ad" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+      <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl border border-emerald-400/30">
+        <div class="text-[11px] uppercase tracking-wider text-emerald-300 font-bold">Rewarded Ad Slot</div>
+        <h3 class="text-xl font-black text-white mt-1">Reviving Player...</h3>
+        <p class="text-xs text-slate-400 mt-1.5">In your Play Store app, a real Google AdMob video plays here.</p>
+        <div class="my-5 mx-auto w-16 h-16 rounded-full border-4 border-emerald-400/30 border-t-emerald-400 flex items-center justify-center">
+          <span id="ad-countdown" class="text-2xl font-black text-emerald-300 tabular-nums">5</span>
+        </div>
+        <button id="btn-ad-claim" type="button" disabled
+          class="w-full py-3 rounded-xl font-bold text-sm bg-emerald-500/30 text-emerald-200 cursor-not-allowed transition">
+          Please wait...
+        </button>
+      </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="overlay-gameover" class="fixed inset-0 z-30 hidden items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
+      <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl border border-white/15">
+        <div id="gameover-record-badge" class="hidden inline-block rounded-full bg-amber-400/20 border border-amber-400/50 px-3 py-0.5 text-xs font-bold text-amber-300 mb-2">
+          ★ NEW HIGH SCORE ★
+        </div>
+        <div id="go-rank-badge" class="inline-block rounded-full bg-cyan-400/15 border border-cyan-400/40 px-3 py-0.5 text-[11px] font-bold text-cyan-200 mb-1.5">
+          RANK: RIFT ROOKIE
+        </div>
+        <h2 class="text-2xl font-black text-white">Game Over</h2>
+        <p id="gameover-reason" class="text-xs text-slate-400 mt-1">Great run!</p>
+
+        <div class="mt-4 grid grid-cols-2 gap-2.5 text-left">
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-[10px] uppercase text-slate-400 font-semibold">Score</div>
+            <div id="go-score" class="text-xl font-black text-white tabular-nums">0</div>
+          </div>
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-[10px] uppercase text-slate-400 font-semibold">Best</div>
+            <div id="go-best" class="text-xl font-black text-amber-300 tabular-nums">0</div>
+          </div>
+        </div>
+
+        <div class="mt-4 flex flex-col gap-2.5">
+          <button id="btn-revive-ad" type="button"
+            class="w-full py-3 rounded-2xl font-extrabold text-sm text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 transition cursor-pointer flex items-center justify-center gap-2">
+            <span>▶</span>
+            <span>WATCH AD TO REVIVE</span>
+          </button>
+          <button id="btn-play-again" type="button"
+            class="w-full py-3 rounded-2xl font-extrabold text-slate-950 bg-gradient-to-r from-amber-300 via-pink-400 to-cyan-300 hover:brightness-110 transition cursor-pointer">
+            PLAY AGAIN
+          </button>
+          <button id="btn-go-hub" type="button"
+            class="w-full py-2.5 rounded-xl font-semibold text-xs text-slate-300 bg-white/10 hover:bg-white/15 transition cursor-pointer">
+            Choose Another Game
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const canvas = document.getElementById('game-canvas');
+      const ctx = canvas.getContext('2d');
+
+      // DOM Refs
+      const hud = document.getElementById('hud');
+      const hudScore = document.getElementById('hud-score');
+      const hudBest = document.getElementById('hud-best');
+      const hudShields = document.getElementById('hud-shields');
+      const btnPhaseHud = document.getElementById('btn-phase-hud');
+      const btnMute = document.getElementById('btn-mute');
+      const muteLabel = document.getElementById('mute-label');
+      const btnHubMute = document.getElementById('btn-hub-mute');
+      const btnPause = document.getElementById('btn-pause');
+      const btnBackHub = document.getElementById('btn-back-hub');
+
+      const touchParadox = document.getElementById('touch-controls-paradox');
+      const btnTetherTouch = document.getElementById('btn-tether-touch');
+      const btnPhaseTouch = document.getElementById('btn-phase-touch');
+      const touchDodge = document.getElementById('touch-controls-dodge');
+      const btnDodgeLeft = document.getElementById('btn-dodge-left');
+      const btnDodgeRight = document.getElementById('btn-dodge-right');
+
+      const overlayHub = document.getElementById('overlay-hub');
+      const hubCoins = document.getElementById('hub-coins');
+      const bestParadoxEl = document.getElementById('best-paradox');
+      const bestDodgeEl = document.getElementById('best-dodge');
+      const bestBreakerEl = document.getElementById('best-breaker');
+
+      const overlayPause = document.getElementById('overlay-pause');
+      const overlayAd = document.getElementById('overlay-ad');
+      const adCountdown = document.getElementById('ad-countdown');
+      const btnAdClaim = document.getElementById('btn-ad-claim');
+      const overlayGameover = document.getElementById('overlay-gameover');
+      const goRecordBadge = document.getElementById('gameover-record-badge');
+      const goRankBadge = document.getElementById('go-rank-badge');
+      const goReason = document.getElementById('gameover-reason');
+      const goScore = document.getElementById('go-score');
+      const goBest = document.getElementById('go-best');
+
+      // Storage
+      const STORE_KEY = 'prism_arcade_save_v2';
+      function loadSave() {
+        try {
+          const raw = localStorage.getItem(STORE_KEY);
+          if (raw) return JSON.parse(raw);
+        } catch (e) {}
+        return { coins: 0, best: { paradox: 0, dodge: 0, breaker: 0 } };
+      }
+      function persistSave() {
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(saveData)); } catch (e) {}
+      }
+      const saveData = loadSave();
+
+      // Web Audio
+      const Sound = {
+        ctx: null,
+        muted: false,
+        init() {
+          if (!this.ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) this.ctx = new AC();
+          }
+          if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+        },
+        tone(f, type, dur, g, slide) {
+          if (this.muted || !this.ctx) return;
+          try {
+            const t = this.ctx.currentTime;
+            const o = this.ctx.createOscillator();
+            const gn = this.ctx.createGain();
+            o.type = type; o.frequency.setValueAtTime(f, t);
+            if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(25, slide), t + dur);
+            gn.gain.setValueAtTime(g, t);
+            gn.gain.exponentialRampToValueAtTime(0.001, t + dur);
+            o.connect(gn); gn.connect(this.ctx.destination);
+            o.start(t); o.stop(t + dur);
+          } catch (e) {}
+        },
+        pop() { this.tone(520, 'triangle', 0.1, 0.09, 820); },
+        phase(s) { this.tone(s ? 480 : 660, 'sine', 0.14, 0.09, s ? 740 : 400); },
+        hit() { this.tone(160, 'sawtooth', 0.22, 0.13, 55); },
+        power() { this.tone(523, 'sine', 0.12, 0.1, 1046); }
+      };
+
+      // Shared App State
+      let width = 800, height = 600, dpr = 1;
+      let rafId = null, lastTime = 0, adTimerId = null;
+
+      const app = {
+        screen: 'hub', // 'hub' | 'playing' | 'paused' | 'gameover'
+        activeGame: 'paradox', // 'paradox' | 'dodge' | 'breaker'
+        score: 0,
+        shields: 2,
+        maxShields: 2,
+        revivedThisRun: false,
+        stars: [],
+        particles: [],
+        texts: []
+      };
+
+      // Game-specific states
+      let px = {}; // Paradox state
+      let dg = {}; // Neon Dodge state
+      let br = {}; // Orbit Breaker state
+
+      function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        width = Math.max(320, rect.width);
+        height = Math.max(400, rect.height);
+        dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        app.stars = [];
+        const n = Math.floor((width * height) / 9000);
+        for (let i = 0; i < n; i++) {
+          app.stars.push({ x: Math.random() * width, y: Math.random() * height, s: Math.random() * 1.8 + 0.5, a: Math.random() * 0.55 + 0.25 });
+        }
+      }
+
+      function spawnParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+          const a = Math.random() * Math.PI * 2, sp = 50 + Math.random() * 180;
+          app.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.55, maxLife: 0.55, size: 2 + Math.random() * 3, color });
+        }
+      }
+      function addText(x, y, text, color) {
+        app.texts.push({ x, y, text, color, life: 0.9 });
+      }
+
+      function updateHubUI() {
+        hubCoins.textContent = saveData.coins.toLocaleString() + ' ◈';
+        bestParadoxEl.textContent = (saveData.best.paradox || 0).toLocaleString();
+        bestDodgeEl.textContent = (saveData.best.dodge || 0).toLocaleString();
+        bestBreakerEl.textContent = (saveData.best.breaker || 0).toLocaleString();
+      }
+
+      let lastHudScore = -1, lastHudShields = -1, lastHudPhase = '', lastHudGame = '';
+      function updateHUD() {
+        const sc = Math.floor(app.score);
+        if (sc !== lastHudScore) {
+          lastHudScore = sc;
+          hudScore.textContent = sc.toLocaleString();
+        }
+        if (app.activeGame !== lastHudGame) {
+          lastHudGame = app.activeGame;
+          hudBest.textContent = (saveData.best[app.activeGame] || 0).toLocaleString();
+        }
+        if (app.shields !== lastHudShields) {
+          lastHudShields = app.shields;
+          hudShields.innerHTML = '';
+          for (let i = 0; i < app.maxShields; i++) {
+            const pip = document.createElement('span');
+            pip.className = i < app.shields
+              ? 'inline-block w-2.5 h-2.5 rounded-full bg-emerald-400'
+              : 'inline-block w-2.5 h-2.5 rounded-full bg-white/15';
+            hudShields.appendChild(pip);
+          }
+        }
+        if (app.activeGame === 'paradox') {
+          if (lastHudPhase !== px.phase) {
+            lastHudPhase = px.phase;
+            btnPhaseHud.classList.remove('hidden');
+            btnPhaseHud.textContent = px.phase === 'solar' ? 'SOLAR' : 'VOID';
+            btnPhaseHud.className = (px.phase === 'solar' ? 'phase-solar-badge' : 'phase-void-badge') + ' rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold cursor-pointer';
+          }
+        } else if (lastHudPhase !== 'none') {
+          lastHudPhase = 'none';
+          btnPhaseHud.classList.add('hidden');
+        }
+      }
+
+      function showHub() {
+        app.screen = 'hub';
+        hud.classList.add('hidden'); hud.classList.remove('flex');
+        touchParadox.classList.add('hidden'); touchParadox.classList.remove('flex');
+        touchDodge.classList.add('hidden'); touchDodge.classList.remove('flex');
+        overlayPause.classList.add('hidden'); overlayPause.classList.remove('flex');
+        overlayGameover.classList.add('hidden'); overlayGameover.classList.remove('flex');
+        overlayHub.classList.remove('hidden'); overlayHub.classList.add('flex');
+        updateHubUI();
+      }
+
+      function triggerGameOver(reason) {
+        app.screen = 'gameover';
+        Sound.hit();
+        const finalScore = Math.floor(app.score);
+        const earnedCoins = Math.max(1, Math.floor(finalScore / 150));
+        saveData.coins += earnedCoins;
+        let isNew = false;
+        if (finalScore > (saveData.best[app.activeGame] || 0)) {
+          saveData.best[app.activeGame] = finalScore;
+          isNew = true;
+        }
+        persistSave();
+
+        goScore.textContent = finalScore.toLocaleString();
+        goBest.textContent = saveData.best[app.activeGame].toLocaleString();
+        goReason.textContent = reason + ' (+' + earnedCoins + ' Prism Coins)';
+        const rank = finalScore >= 6000 ? 'PARADOX LEGEND' : finalScore >= 3000 ? 'QUANTUM ACE' : finalScore >= 1000 ? 'STAR WEAVER' : 'RIFT ROOKIE';
+        goRankBadge.textContent = 'RANK: ' + rank;
+
+        if (isNew) goRecordBadge.classList.remove('hidden');
+        else goRecordBadge.classList.add('hidden');
+
+        const btnRev = document.getElementById('btn-revive-ad');
+        if (app.revivedThisRun) btnRev.classList.add('hidden');
+        else btnRev.classList.remove('hidden');
+
+        if (window.PrismAds && typeof window.PrismAds.onGameOver === 'function') {
+          window.PrismAds.onGameOver();
+        }
+        touchParadox.classList.add('hidden'); touchParadox.classList.remove('flex');
+        touchDodge.classList.add('hidden'); touchDodge.classList.remove('flex');
+        overlayGameover.classList.remove('hidden'); overlayGameover.classList.add('flex');
+      }
+
+      // ================= GAME 1: PRISM PARADOX =================
+      function initParadox() {
+        app.shields = 2; app.maxShields = 2;
+        px = {
+          phase: 'solar', combo: 1, comboTimer: 0, invuln: 1.0, fever: 0,
+          camY: -height * 0.6, highY: 0, sweepY: 250, nextY: -260,
+          tether: false, anchor: null, angle: 0, rad: 90, dir: 1, spd: 3.4,
+          p: { x: width * 0.5, y: 0, vx: 0, vy: -250, r: 13, trail: [] },
+          anchors: [{ x: width * 0.5, y: -140, r: 10 }],
+          shards: [], hazards: [], portals: []
+        };
+        while (px.nextY > -height * 1.4) { spawnParadoxRow(px.nextY); px.nextY -= 145; }
+        touchParadox.classList.remove('hidden'); touchParadox.classList.add('flex');
+      }
+      function spawnParadoxRow(y) {
+        const m = 55, uw = Math.max(120, width - m * 2);
+        px.anchors.push({ x: m + Math.random() * uw, y, r: 10 });
+        if (Math.random() < 0.45) px.anchors.push({ x: m + Math.random() * uw, y: y - 20, r: 10 });
+        const ph = Math.random() < 0.5 ? 'solar' : 'void';
+        const sx = m + Math.random() * uw;
+        for (let k = 0; k < 3; k++) {
+          px.shards.push({ x: Math.max(m, Math.min(width - m, sx + (k - 1) * 24)), y: y - 45 - Math.abs(k - 1) * 14, phase: ph, r: 9, got: false });
+        }
+        if (y < -150 && Math.random() < 0.72) {
+          const hp = Math.random() < 0.5 ? 'solar' : 'void';
+          const gw = Math.min(uw * 0.5, 110 + Math.random() * 60);
+          px.hazards.push({ x: m + Math.random() * Math.max(10, uw - gw), y: y - 68, w: gw, h: 10, phase: hp });
+        }
+        if (y < -320 && Math.random() < 0.14) {
+          px.portals.push({ x: m + Math.random() * uw, y: y - 75, r: 20, used: false });
+        }
+      }
+      function paradoxFlip() {
+        if (app.screen !== 'playing' || app.activeGame !== 'paradox') return;
+        px.phase = px.phase === 'solar' ? 'void' : 'solar';
+        Sound.phase(px.phase === 'solar');
+        updateHUD();
+      }
+      function paradoxTetherStart() {
+        if (app.screen !== 'playing' || app.activeGame !== 'paradox' || px.tether) return;
+        let best = null, bd = 300;
+        for (const a of px.anchors) {
+          const d = Math.hypot(a.x - px.p.x, a.y - px.p.y);
+          if (d < bd && d > 16) { bd = d; best = a; }
+        }
+        if (best) {
+          px.tether = true; px.anchor = best;
+          const dx = px.p.x - best.x, dy = px.p.y - best.y;
+          px.angle = Math.atan2(dy, dx);
+          px.rad = Math.max(46, Math.min(185, Math.hypot(dx, dy)));
+          px.dir = (dx * px.p.vy - dy * px.p.vx) >= 0 ? 1 : -1;
+          px.spd = 3.6;
+          Sound.pop();
+        } else {
+          px.p.vy = Math.min(px.p.vy, -240);
+        }
+      }
+      function paradoxTetherEnd() {
+        if (!px.tether) return;
+        px.tether = false; px.anchor = null;
+        px.p.vx *= 1.15; px.p.vy = Math.min(px.p.vy * 1.15, -190);
+      }
+      function updateParadox(dt) {
+        if (px.invuln > 0) px.invuln -= dt;
+        if (px.fever > 0) px.fever -= dt;
+        if (px.comboTimer > 0) { px.comboTimer -= dt; if (px.comboTimer <= 0) px.combo = 1; }
+        const p = px.p;
+        if (px.tether && px.anchor) {
+          px.angle += px.dir * px.spd * dt;
+          const ox = p.x, oy = p.y;
+          p.x = px.anchor.x + Math.cos(px.angle) * px.rad;
+          p.y = px.anchor.y + Math.sin(px.angle) * px.rad;
+          p.vx = (p.x - ox) / Math.max(dt, 0.001);
+          p.vy = (p.y - oy) / Math.max(dt, 0.001);
+        } else {
+          p.vy += 115 * dt;
+          p.x += p.vx * dt; p.y += p.vy * dt;
+        }
+        if (p.x < 18) { p.x = 18; p.vx = Math.abs(p.vx) * 0.85; }
+        if (p.x > width - 18) { p.x = width - 18; p.vx = -Math.abs(p.vx) * 0.85; }
+        p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > 16) p.trail.shift();
+
+        if (p.y < px.highY) { app.score += (px.highY - p.y) * 0.14 * px.combo; px.highY = p.y; }
+        const tc = p.y - height * 0.56;
+        if (tc < px.camY) px.camY += (tc - px.camY) * Math.min(1, dt * 8);
+        px.sweepY -= 62 * dt;
+        if (px.sweepY > px.camY + height + 100) px.sweepY = px.camY + height + 100;
+        if (p.y + p.r > px.sweepY) { triggerGameOver('Caught by the Entropy Sweep.'); return; }
+        while (px.nextY > px.camY - height) { spawnParadoxRow(px.nextY); px.nextY -= 145; }
+
+        for (const s of px.shards) {
+          if (s.got) continue;
+          if ((s.phase === px.phase || px.fever > 0) && Math.hypot(p.x - s.x, p.y - s.y) < p.r + s.r + 6) {
+            s.got = true; px.combo = Math.min(8, px.combo + 1); px.comboTimer = 4;
+            if (px.combo >= 5 && px.fever <= 0) { px.fever = 5; addText(p.x, p.y - 24, 'FEVER MODE!', '#f472b6'); Sound.power(); }
+            app.score += 50 * px.combo; Sound.pop();
+            spawnParticles(s.x, s.y, s.phase === 'solar' ? '#fbbf24' : '#22d3ee', 8);
+          }
+        }
+        for (const pt of px.portals) {
+          if (!pt.used && Math.hypot(p.x - pt.x, p.y - pt.y) < p.r + pt.r + 5) {
+            pt.used = true; px.tether = false; px.anchor = null; px.invuln = 1.5; p.vy = -500; app.score += 300;
+            Sound.power(); addText(pt.x, pt.y, 'WARP +300!', '#e879f9');
+          }
+        }
+        for (const h of px.hazards) {
+          if (h.phase !== px.phase) continue;
+          const cx = Math.max(h.x, Math.min(p.x, h.x + h.w));
+          const cy = Math.max(h.y - 5, Math.min(p.y, h.y + 5));
+          if (Math.hypot(p.x - cx, p.y - cy) < p.r - 2) {
+            if (px.fever > 0) { h.phase = 'dead'; app.score += 100; spawnParticles(p.x, p.y, '#f472b6', 10); }
+            else if (px.invuln <= 0) {
+              app.shields -= 1; px.invuln = 1.4; Sound.hit();
+              if (app.shields <= 0) { triggerGameOver('Hit an active laser gate.'); return; }
+            }
+          }
+        }
+        const cull = px.sweepY + 200;
+        px.anchors = px.anchors.filter(a => a.y < cull);
+        px.shards = px.shards.filter(s => !s.got && s.y < cull);
+        px.hazards = px.hazards.filter(h => h.phase !== 'dead' && h.y < cull);
+        px.portals = px.portals.filter(pt => !pt.used && pt.y < cull);
+      }
+      function renderParadox() {
+        const sol = px.phase === 'solar';
+        ctx.save(); ctx.translate(0, -px.camY);
+        if (px.tether && px.anchor) {
+          ctx.strokeStyle = sol ? '#fbbf24' : '#22d3ee'; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.moveTo(px.p.x, px.p.y); ctx.lineTo(px.anchor.x, px.anchor.y); ctx.stroke();
+        }
+        for (const a of px.anchors) {
+          ctx.fillStyle = px.anchor === a ? '#fff' : '#94a3b8';
+          ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2); ctx.fill();
+        }
+        for (const pt of px.portals) {
+          ctx.strokeStyle = '#c084fc'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 1.6); ctx.stroke();
+        }
+        for (const s of px.shards) {
+          ctx.globalAlpha = (s.phase === px.phase || px.fever > 0) ? 1 : 0.25;
+          ctx.fillStyle = s.phase === 'solar' ? '#fbbf24' : '#22d3ee';
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        for (const h of px.hazards) {
+          const active = h.phase === px.phase;
+          ctx.globalAlpha = active ? 0.95 : 0.22;
+          ctx.fillStyle = h.phase === 'solar' ? '#f59e0b' : '#06b6d4';
+          ctx.fillRect(h.x, h.y - 5, h.w, 10);
+        }
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(244,63,94,0.6)'; ctx.fillRect(0, px.sweepY, width, 120);
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px.p.x, px.p.y, px.p.r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = px.fever > 0 ? '#f472b6' : (sol ? '#fbbf24' : '#22d3ee');
+        ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(px.p.x, px.p.y, px.p.r + 4, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+
+      // ================= GAME 2: NEON LASER RUSH =================
+      function initDodge() {
+        app.shields = 2; app.maxShields = 2;
+        dg = { lane: 2, targetX: width * 0.5, x: width * 0.5, y: height * 0.74, speed: 300, spawnT: 0, invuln: 1.0, items: [] };
+        touchDodge.classList.remove('hidden'); touchDodge.classList.add('flex');
+      }
+      function dodgeMove(dir) {
+        if (app.screen !== 'playing' || app.activeGame !== 'dodge') return;
+        dg.lane = Math.max(0, Math.min(4, dg.lane + dir));
+        Sound.pop();
+      }
+      function updateDodge(dt) {
+        if (dg.invuln > 0) dg.invuln -= dt;
+        const laneW = Math.min(width - 40, 420) / 5;
+        const startX = (width - laneW * 5) / 2;
+        dg.targetX = startX + dg.lane * laneW + laneW / 2;
+        dg.x += (dg.targetX - dg.x) * Math.min(1, dt * 16);
+        dg.speed = Math.min(640, dg.speed + 10 * dt);
+        app.score += dt * 40;
+
+        dg.spawnT -= dt;
+        if (dg.spawnT <= 0) {
+          dg.spawnT = Math.max(0.28, 0.72 - (dg.speed - 300) / 800);
+          const l = Math.floor(Math.random() * 5);
+          const isCoin = Math.random() < 0.38;
+          dg.items.push({ lane: l, x: startX + l * laneW + laneW / 2, y: -30, type: isCoin ? 'coin' : 'laser', r: 16 });
+        }
+        for (const it of dg.items) {
+          it.y += dg.speed * dt;
+          if (!it.hit && Math.hypot(dg.x - it.x, dg.y - it.y) < 28) {
+            it.hit = true;
+            if (it.type === 'coin') {
+              app.score += 100; Sound.power(); spawnParticles(it.x, it.y, '#fbbf24', 10);
+              addText(it.x, it.y, '+100', '#fbbf24');
+            } else if (dg.invuln <= 0) {
+              app.shields -= 1; dg.invuln = 1.3; Sound.hit(); spawnParticles(dg.x, dg.y, '#fb7185', 14);
+              if (app.shields <= 0) { triggerGameOver('Crashed into a Neon Laser!'); return; }
+            }
+          }
+        }
+        dg.items = dg.items.filter(it => !it.hit && it.y < height + 50);
+      }
+      function renderDodge() {
+        const laneW = Math.min(width - 40, 420) / 5;
+        const startX = (width - laneW * 5) / 2;
+        ctx.strokeStyle = 'rgba(34,211,238,0.15)'; ctx.lineWidth = 1.5;
+        for (let i = 0; i <= 5; i++) {
+          ctx.beginPath(); ctx.moveTo(startX + i * laneW, 0); ctx.lineTo(startX + i * laneW, height); ctx.stroke();
+        }
+        for (const it of dg.items) {
+          if (it.type === 'coin') {
+            ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(it.x, it.y, 12, 0, Math.PI * 2); ctx.fill();
+          } else {
+            ctx.fillStyle = '#f43f5e'; ctx.fillRect(it.x - laneW * 0.38, it.y - 8, laneW * 0.76, 16);
+          }
+        }
+        // Jet Ship
+        if (dg.invuln <= 0 || Math.floor(performance.now() / 80) % 2 === 0) {
+          ctx.fillStyle = '#22d3ee';
+          ctx.beginPath(); ctx.moveTo(dg.x, dg.y - 20); ctx.lineTo(dg.x + 16, dg.y + 14); ctx.lineTo(dg.x - 16, dg.y + 14); ctx.closePath(); ctx.fill();
+        }
+      }
+
+      // ================= GAME 3: ORBIT BREAKER =================
+      function initBreaker() {
+        app.shields = 2; app.maxShields = 2;
+        br = {
+          padX: width * 0.5, padW: Math.min(130, width * 0.28),
+          balls: [{ x: width * 0.5, y: height * 0.7, vx: 190, vy: -280, r: 8 }],
+          bricks: []
+        };
+        spawnBreakerWave();
+      }
+      function spawnBreakerWave() {
+        br.bricks = [];
+        const cols = 6, margin = 24, bw = (width - margin * 2 - (cols - 1) * 8) / cols;
+        const colors = ['#f472b6', '#fbbf24', '#22d3ee', '#a78bfa'];
+        for (let r = 0; r < 4; r++) {
+          for (let c = 0; c < cols; c++) {
+            br.bricks.push({ x: margin + c * (bw + 8), y: 86 + r * 30, w: bw, h: 20, col: colors[r], alive: true });
+          }
+        }
+      }
+      function updateBreaker(dt) {
+        const py = height - 64;
+        for (const b of br.balls) {
+          b.x += b.vx * dt; b.y += b.vy * dt;
+          if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx); Sound.pop(); }
+          if (b.x > width - b.r) { b.x = width - b.r; b.vx = -Math.abs(b.vx); Sound.pop(); }
+          if (b.y < 60) { b.y = 60; b.vy = Math.abs(b.vy); Sound.pop(); }
+          // Paddle hit
+          if (b.vy > 0 && b.y + b.r >= py && b.y - b.r <= py + 14 && Math.abs(b.x - br.padX) <= br.padW / 2 + b.r) {
+            b.y = py - b.r;
+            const offset = (b.x - br.padX) / (br.padW / 2);
+            const spd = Math.min(480, Math.hypot(b.vx, b.vy) * 1.02);
+            const ang = offset * 1.1;
+            b.vx = Math.sin(ang) * spd;
+            b.vy = -Math.cos(ang) * spd;
+            Sound.pop();
+          }
+          // Brick hits
+          for (const k of br.bricks) {
+            if (!k.alive) continue;
+            if (b.x + b.r > k.x && b.x - b.r < k.x + k.w && b.y + b.r > k.y && b.y - b.r < k.y + k.h) {
+              k.alive = false; b.vy = -b.vy; app.score += 75;
+              Sound.power(); spawnParticles(k.x + k.w / 2, k.y + 10, k.col, 8);
+              if (Math.random() < 0.16 && br.balls.length < 4) {
+                br.balls.push({ x: b.x, y: b.y, vx: -b.vx, vy: b.vy, r: 8 });
+                addText(b.x, b.y, 'MULTI-BALL!', '#f472b6');
+              }
+              break;
+            }
+          }
+        }
+        br.balls = br.balls.filter(b => b.y < height + 20);
+        if (br.balls.length === 0) {
+          app.shields -= 1; Sound.hit();
+          if (app.shields <= 0) { triggerGameOver('All energy balls lost!'); return; }
+          br.balls.push({ x: br.padX, y: height - 90, vx: 180, vy: -280, r: 8 });
+        }
+        if (br.bricks.every(k => !k.alive)) {
+          app.score += 300; addText(width / 2, height / 2, 'WAVE CLEAR +300!', '#34d399');
+          spawnBreakerWave();
+        }
+      }
+      function renderBreaker() {
+        for (const k of br.bricks) {
+          if (!k.alive) continue;
+          ctx.fillStyle = k.col; ctx.fillRect(k.x, k.y, k.w, k.h);
+        }
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(br.padX - br.padW / 2, height - 64, br.padW, 14);
+        for (const b of br.balls) {
+          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // ================= LAUNCH & LOOP =================
+      function launchGame(gameName) {
+        Sound.init();
+        app.activeGame = gameName;
+        app.screen = 'playing';
+        app.score = 0;
+        app.revivedThisRun = false;
+        app.particles = []; app.texts = [];
+
+        overlayHub.classList.add('hidden'); overlayHub.classList.remove('flex');
+        overlayPause.classList.add('hidden'); overlayPause.classList.remove('flex');
+        overlayGameover.classList.add('hidden'); overlayGameover.classList.remove('flex');
+        touchParadox.classList.add('hidden'); touchParadox.classList.remove('flex');
+        touchDodge.classList.add('hidden'); touchDodge.classList.remove('flex');
+        hud.classList.remove('hidden'); hud.classList.add('flex');
+
+        if (gameName === 'paradox') initParadox();
+        else if (gameName === 'dodge') initDodge();
+        else initBreaker();
+
+        updateHUD();
+        lastTime = performance.now();
+      }
+
+      function reviveCurrentGame() {
+        app.revivedThisRun = true;
+        app.screen = 'playing';
+        app.shields = 1;
+        if (app.activeGame === 'paradox') {
+          px.invuln = 2.5; px.p.vy = -240; px.sweepY = Math.max(px.sweepY, px.p.y + 220);
+          touchParadox.classList.remove('hidden'); touchParadox.classList.add('flex');
+        } else if (app.activeGame === 'dodge') {
+          dg.invuln = 2.5; dg.items = [];
+          touchDodge.classList.remove('hidden'); touchDodge.classList.add('flex');
+        } else {
+          br.balls = [{ x: br.padX, y: height - 90, vx: 180, vy: -280, r: 8 }];
+        }
+        overlayGameover.classList.add('hidden'); overlayGameover.classList.remove('flex');
+        overlayAd.classList.add('hidden'); overlayAd.classList.remove('flex');
+        lastTime = performance.now();
+        updateHUD();
+      }
+
+      function loop(now) {
+        const dt = Math.min((now - lastTime) / 1000, 0.04);
+        lastTime = now;
+
+        // Background
+        ctx.fillStyle = '#070812';
+        ctx.fillRect(0, 0, width, height);
+        for (const st of app.stars) {
+          ctx.fillStyle = `rgba(226,232,240,${st.a})`;
+          ctx.beginPath(); ctx.arc(st.x, st.y, st.s, 0, Math.PI * 2); ctx.fill();
+        }
+
+        if (app.screen === 'playing') {
+          if (app.activeGame === 'paradox') updateParadox(dt);
+          else if (app.activeGame === 'dodge') updateDodge(dt);
+          else updateBreaker(dt);
+          updateHUD();
+        }
+
+        if (app.screen !== 'hub') {
+          if (app.activeGame === 'paradox') renderParadox();
+          else if (app.activeGame === 'dodge') renderDodge();
+          else renderBreaker();
+        }
+
+        for (const pt of app.particles) {
+          pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.life -= dt;
+          ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+          ctx.fillStyle = pt.color; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        app.particles = app.particles.filter(pt => pt.life > 0);
+
+        for (const tx of app.texts) {
+          tx.y -= 40 * dt; tx.life -= dt;
+          ctx.globalAlpha = Math.max(0, tx.life);
+          ctx.fillStyle = tx.color; ctx.font = '800 14px Inter, sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText(tx.text, tx.x, tx.y);
+        }
+        ctx.globalAlpha = 1;
+        app.texts = app.texts.filter(tx => tx.life > 0);
+
+        rafId = requestAnimationFrame(loop);
+      }
+
+      // Wire Buttons & Inputs
+      document.getElementById('btn-play-paradox').addEventListener('click', () => launchGame('paradox'));
+      document.getElementById('btn-play-dodge').addEventListener('click', () => launchGame('dodge'));
+      document.getElementById('btn-play-breaker').addEventListener('click', () => launchGame('breaker'));
+      document.getElementById('btn-play-again').addEventListener('click', () => launchGame(app.activeGame));
+      document.getElementById('btn-restart-pause').addEventListener('click', () => launchGame(app.activeGame));
+      btnBackHub.addEventListener('click', showHub);
+      document.getElementById('btn-hub-pause').addEventListener('click', showHub);
+      document.getElementById('btn-go-hub').addEventListener('click', showHub);
+
+      function toggleMute() {
+        Sound.muted = !Sound.muted;
+        const icon = Sound.muted ? '🔇' : '🔊';
+        muteLabel.textContent = icon; btnHubMute.textContent = icon;
+        if (!Sound.muted) Sound.init();
+      }
+      btnMute.addEventListener('click', toggleMute);
+      btnHubMute.addEventListener('click', toggleMute);
+
+      btnPause.addEventListener('click', () => {
+        if (app.screen === 'playing') { app.screen = 'paused'; overlayPause.classList.remove('hidden'); overlayPause.classList.add('flex'); }
+      });
+      document.getElementById('btn-resume').addEventListener('click', () => {
+        if (app.screen === 'paused') { app.screen = 'playing'; lastTime = performance.now(); overlayPause.classList.add('hidden'); overlayPause.classList.remove('flex'); }
+      });
+
+      btnPhaseHud.addEventListener('click', paradoxFlip);
+      btnTetherTouch.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); paradoxTetherStart(); });
+      btnTetherTouch.addEventListener('pointerup', paradoxTetherEnd);
+      btnPhaseTouch.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); paradoxFlip(); });
+      btnDodgeLeft.addEventListener('pointerdown', (e) => { e.preventDefault(); dodgeMove(-1); });
+      btnDodgeRight.addEventListener('pointerdown', (e) => { e.preventDefault(); dodgeMove(1); });
+
+      canvas.addEventListener('pointerdown', (e) => {
+        if (app.screen !== 'playing') return;
+        if (app.activeGame === 'paradox') {
+          if (e.button === 2 || (e.pointerType === 'touch' && e.clientX > width * 0.55)) paradoxFlip();
+          else paradoxTetherStart();
+        } else if (app.activeGame === 'dodge') {
+          dodgeMove(e.clientX < width * 0.5 ? -1 : 1);
+        } else if (app.activeGame === 'breaker') {
+          br.padX = Math.max(br.padW / 2, Math.min(width - br.padW / 2, e.clientX));
+        }
+      });
+      canvas.addEventListener('pointermove', (e) => {
+        if (app.screen === 'playing' && app.activeGame === 'breaker') {
+          br.padX = Math.max(br.padW / 2, Math.min(width - br.padW / 2, e.clientX));
+        }
+      });
+      window.addEventListener('pointerup', paradoxTetherEnd);
+      canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      window.addEventListener('keydown', (e) => {
+        if (app.screen !== 'playing') return;
+        if (app.activeGame === 'paradox') {
+          if (e.code === 'Space' && !e.repeat) { e.preventDefault(); paradoxTetherStart(); }
+          if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyF') && !e.repeat) { e.preventDefault(); paradoxFlip(); }
+        } else if (app.activeGame === 'dodge') {
+          if (e.code === 'ArrowLeft' || e.code === 'KeyA') dodgeMove(-1);
+          if (e.code === 'ArrowRight' || e.code === 'KeyD') dodgeMove(1);
+        } else if (app.activeGame === 'breaker') {
+          if (e.code === 'ArrowLeft' || e.code === 'KeyA') br.padX = Math.max(br.padW / 2, br.padX - 36);
+          if (e.code === 'ArrowRight' || e.code === 'KeyD') br.padX = Math.min(width - br.padW / 2, br.padX + 36);
+        }
+      });
+      window.addEventListener('keyup', (e) => { if (e.code === 'Space') paradoxTetherEnd(); });
+
+      // Rewarded Ad Revive
+      document.getElementById('btn-revive-ad').addEventListener('click', () => {
+        if (app.revivedThisRun) return;
+        if (window.PrismAds && typeof window.PrismAds.showRewarded === 'function') {
+          window.PrismAds.showRewarded(reviveCurrentGame);
+          return;
+        }
+        overlayAd.classList.remove('hidden'); overlayAd.classList.add('flex');
+        let sec = 5; adCountdown.textContent = '5';
+        btnAdClaim.disabled = true; btnAdClaim.textContent = 'Please wait...';
+        btnAdClaim.className = 'w-full py-3 rounded-xl font-bold text-sm bg-emerald-500/30 text-emerald-200 cursor-not-allowed transition';
+        if (adTimerId) clearInterval(adTimerId);
+        adTimerId = setInterval(() => {
+          sec -= 1; adCountdown.textContent = String(Math.max(0, sec));
+          if (sec <= 0) {
+            clearInterval(adTimerId); adTimerId = null;
+            btnAdClaim.disabled = false; btnAdClaim.textContent = 'Claim Revive & Resume';
+            btnAdClaim.className = 'w-full py-3 rounded-xl font-extrabold text-sm bg-emerald-400 text-slate-950 cursor-pointer transition';
+          }
+        }, 1000);
+      });
+      btnAdClaim.addEventListener('click', () => { if (!btnAdClaim.disabled) reviveCurrentGame(); });
+
+      window.addEventListener('resize', resizeCanvas);
+      let initialized = false;
+      function initApp() {
+        if (initialized) return;
+        initialized = true;
+        resizeCanvas();
+        updateHubUI();
+        lastTime = performance.now();
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(loop);
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initApp);
+      else initApp();
+      window.addEventListener('load', initApp);
+    })();
+  </script>
+</body>
+</html>
