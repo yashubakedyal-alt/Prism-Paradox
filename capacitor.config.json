@@ -1,0 +1,6 @@
+{
+  "appId": "com.prismparadox.game",
+  "appName": "Prism Paradox",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
