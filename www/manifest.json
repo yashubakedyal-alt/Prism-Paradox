@@ -1,0 +1,9 @@
+{
+  "name": "Prism Paradox",
+  "short_name": "PrismParadox",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#070812",
+  "theme_color": "#070812"
+}
