@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Prism Paradox — Dual-Phase Gravity Game</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #070812;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #f8fafc;
+    }
+    #game-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: crosshair;
+    }
+    .glass-panel {
+      background: rgba(12, 14, 28, 0.82);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .phase-solar-badge {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(236, 72, 153, 0.25));
+      border: 1px solid rgba(251, 191, 36, 0.65);
+      color: #fde68a;
+      box-shadow: 0 0 18px rgba(245, 158, 11, 0.35);
+    }
+    .phase-void-badge {
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.28), rgba(139, 92, 246, 0.25));
+      border: 1px solid rgba(34, 211, 238, 0.65);
+      color: #a5f3fc;
+      box-shadow: 0 0 18px rgba(6, 182, 212, 0.35);
+    }
+    .control-btn:active {
+      transform: scale(0.96);
+    }
+    .hidden {
+      display: none !important;
+    }
+    .flex {
+      display: flex;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-wrapper">
+    <!-- Top HUD -->
+    <header id="hud" class="pointer-events-none fixed top-0 left-0 right-0 z-20 flex items-center justify-between gap-2 px-3 py-2.5 sm:px-5 sm:py-3">
+      <div class="pointer-events-auto flex items-center gap-2 sm:gap-3">
+        <div class="glass-panel rounded-xl px-3 py-1.5 flex items-center gap-3">
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Score</div>
+            <div id="hud-score" class="text-base sm:text-xl font-extrabold tabular-nums leading-tight">0</div>
+          </div>
+          <div class="h-6 w-px bg-white/10"></div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Best</div>
+            <div id="hud-best" class="text-sm sm:text-base font-bold text-slate-200 tabular-nums leading-tight">0</div>
+          </div>
+        </div>
+
+        <div id="hud-combo-wrap" class="glass-panel rounded-xl px-2.5 py-1.5 hidden sm:flex flex-col items-center">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Combo</div>
+          <div id="hud-combo" class="text-sm sm:text-base font-extrabold text-amber-300 tabular-nums leading-tight">x1</div>
+        </div>
+      </div>
+
+      <div class="pointer-events-auto flex items-center gap-2">
+        <button id="btn-phase-hud" type="button" title="Flip Phase (Shift / Right-Click)"
+          class="phase-solar-badge rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold tracking-wide transition-all cursor-pointer">
+          SOLAR
+        </button>
+
+        <div id="hud-shields" class="glass-panel rounded-xl px-2.5 py-1.5 flex items-center gap-1" title="Shields">
+          <!-- Shield pips rendered by JS -->
+        </div>
+
+        <button id="btn-mute" type="button" title="Toggle Sound"
+          class="glass-panel rounded-xl p-2 text-slate-200 hover:text-white hover:bg-white/10 transition cursor-pointer"
+          aria-label="Toggle Sound">
+          <svg id="icon-sound-on" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.07 4.93a10 10 0 010 14.14"></path>
+          </svg>
+          <svg id="icon-sound-off" class="w-4 h-4 sm:w-5 sm:h-5 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M23 9l-6 6M17 9l6 6"></path>
+          </svg>
+        </button>
+
+        <button id="btn-pause" type="button" title="Pause (P / Esc)"
+          class="glass-panel rounded-xl p-2 text-slate-200 hover:text-white hover:bg-white/10 transition cursor-pointer hidden"
+          aria-label="Pause Game">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 4H6v16h4V4zM18 4h-4v16h4V4z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Game Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- On-Screen Touch / Click Controls (visible during active play) -->
+    <div id="touch-controls" class="pointer-events-none fixed bottom-3 left-0 right-0 z-20 hidden justify-between items-end px-3 sm:px-6 gap-3">
+      <button id="btn-tether-touch" type="button"
+        class="pointer-events-auto control-btn glass-panel flex-1 max-w-[200px] py-3.5 px-4 rounded-2xl border border-white/20 text-center transition">
+        <div class="text-xs sm:text-sm font-extrabold tracking-wide text-white">HOLD: ORBIT</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Space / Left Click</div>
+      </button>
+
+      <div id="status-pill" class="hidden md:flex glass-panel rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-300 items-center gap-2">
+        <span id="status-wave">Wave 1</span>
+        <span class="text-slate-600">•</span>
+        <span id="status-grazes">Grazes: 0</span>
+      </div>
+
+      <button id="btn-phase-touch" type="button"
+        class="pointer-events-auto control-btn glass-panel flex-1 max-w-[200px] py-3.5 px-4 rounded-2xl border border-cyan-400/35 text-center transition">
+        <div class="text-xs sm:text-sm font-extrabold tracking-wide text-cyan-200">TAP: PHASE FLIP</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Shift / Right Click</div>
+      </button>
+    </div>
+
+    <!-- Start Overlay -->
+    <div id="overlay-start" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+      <div class="glass-panel w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/15 text-center">
+        <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-amber-300 mb-3">
+          <span>✦</span>
+          <span>DUAL-DIMENSION GRAVITY ARCADE</span>
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-amber-300 via-pink-400 to-cyan-300 bg-clip-text text-transparent">
+          PRISM PARADOX
+        </h1>
+        <p class="mt-2.5 text-sm text-slate-300 leading-relaxed">
+          Orbit glowing star anchors, slingshot upward, and <strong class="text-white">flip dimensions</strong> mid-flight to phase right through matching hazards.
+        </p>
+
+        <div class="mt-5 grid grid-cols-2 gap-2.5 text-left">
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-xs font-bold text-amber-300">1. Orbit &amp; Slingshot</div>
+            <p class="text-[11px] text-slate-300 mt-1 leading-snug">Hold <span class="text-white font-semibold">Space / Click / Hold</span> to tether a star. Release to launch.</p>
+          </div>
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-xs font-bold text-cyan-300">2. Phase Flip</div>
+            <p class="text-[11px] text-slate-300 mt-1 leading-snug">Press <span class="text-white font-semibold">Shift / Right-Click</span> to swap <span class="text-amber-300">Solar</span> &amp; <span class="text-cyan-300">Void</span>.</p>
+          </div>
+        </div>
+
+        <div class="mt-5">
+          <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-2">Select Mode</div>
+          <div class="grid grid-cols-3 gap-2" id="difficulty-group">
+            <button type="button" data-diff="chill"
+              class="diff-btn rounded-xl py-2 px-2 text-xs font-bold border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 transition cursor-pointer">
+              Chill
+            </button>
+            <button type="button" data-diff="arcade"
+              class="diff-btn rounded-xl py-2 px-2 text-xs font-bold border border-cyan-400/70 bg-cyan-500/20 text-white transition cursor-pointer">
+              Arcade
+            </button>
+            <button type="button" data-diff="hyper"
+              class="diff-btn rounded-xl py-2 px-2 text-xs font-bold border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 transition cursor-pointer">
+              Hyper
+            </button>
+          </div>
+        </div>
+
+        <button id="btn-start" type="button"
+          class="mt-6 w-full py-3.5 rounded-2xl font-extrabold text-base tracking-wide text-slate-950 bg-gradient-to-r from-amber-300 via-pink-400 to-cyan-300 hover:brightness-110 active:scale-[0.98] transition shadow-lg shadow-cyan-500/20 cursor-pointer">
+          LAUNCH CORE
+        </button>
+      </div>
+    </div>
+
+    <!-- Pause Overlay -->
+    <div id="overlay-pause" class="fixed inset-0 z-30 hidden items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+      <div class="glass-panel w-full max-w-xs rounded-3xl p-6 text-center shadow-2xl border border-white/15">
+        <h2 class="text-2xl font-extrabold text-white">Paused</h2>
+        <p class="text-xs text-slate-400 mt-1">Take a breather between dimensions.</p>
+        <div class="mt-5 flex flex-col gap-2.5">
+          <button id="btn-resume" type="button"
+            class="w-full py-3 rounded-xl font-bold text-slate-950 bg-gradient-to-r from-amber-300 to-cyan-300 hover:brightness-110 transition cursor-pointer">
+            Resume Game
+          </button>
+          <button id="btn-restart-pause" type="button"
+            class="w-full py-2.5 rounded-xl font-semibold text-sm text-slate-200 bg-white/10 hover:bg-white/15 transition cursor-pointer">
+            Restart
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rewarded Ad Preview Modal (bridges to AdMob in native app) -->
+    <div id="overlay-ad" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+      <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl border border-emerald-400/30">
+        <div class="text-[11px] uppercase tracking-wider text-emerald-300 font-bold">Rewarded Ad Slot</div>
+        <h3 class="text-xl font-black text-white mt-1">Reviving Core...</h3>
+        <p class="text-xs text-slate-400 mt-1.5">In your Play Store app, a real Google AdMob video plays here.</p>
+        <div class="my-5 mx-auto w-16 h-16 rounded-full border-4 border-emerald-400/30 border-t-emerald-400 flex items-center justify-center">
+          <span id="ad-countdown" class="text-2xl font-black text-emerald-300 tabular-nums">5</span>
+        </div>
+        <button id="btn-ad-claim" type="button" disabled
+          class="w-full py-3 rounded-xl font-bold text-sm bg-emerald-500/30 text-emerald-200 cursor-not-allowed transition">
+          Please wait...
+        </button>
+      </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="overlay-gameover" class="fixed inset-0 z-30 hidden items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
+      <div class="glass-panel w-full max-w-sm rounded-3xl p-6 sm:p-7 text-center shadow-2xl border border-white/15">
+        <div id="gameover-record-badge" class="hidden inline-block rounded-full bg-amber-400/20 border border-amber-400/50 px-3 py-0.5 text-xs font-bold text-amber-300 mb-2">
+          ★ NEW HIGH SCORE ★
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-black text-white">Core Shattered</h2>
+        <p id="gameover-reason" class="text-xs text-slate-400 mt-1">Collided with an active dimension hazard.</p>
+
+        <div class="mt-5 grid grid-cols-2 gap-2.5 text-left">
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Final Score</div>
+            <div id="go-score" class="text-xl font-black text-white tabular-nums mt-0.5">0</div>
+          </div>
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Best Score</div>
+            <div id="go-best" class="text-xl font-black text-amber-300 tabular-nums mt-0.5">0</div>
+          </div>
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Shards</div>
+            <div id="go-shards" class="text-lg font-bold text-cyan-300 tabular-nums mt-0.5">0</div>
+          </div>
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Paradox Grazes</div>
+            <div id="go-grazes" class="text-lg font-bold text-pink-300 tabular-nums mt-0.5">0</div>
+          </div>
+        </div>
+
+        <div class="mt-5 flex flex-col gap-2.5">
+          <button id="btn-revive-ad" type="button"
+            class="w-full py-3 rounded-2xl font-extrabold text-sm text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 transition shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2">
+            <span>▶</span>
+            <span>WATCH AD TO REVIVE (+1 SHIELD)</span>
+          </button>
+          <button id="btn-play-again" type="button"
+            class="w-full py-3.5 rounded-2xl font-extrabold text-slate-950 bg-gradient-to-r from-amber-300 via-pink-400 to-cyan-300 hover:brightness-110 transition cursor-pointer">
+            PLAY AGAIN
+          </button>
+          <button id="btn-change-mode" type="button"
+            class="w-full py-2.5 rounded-xl font-semibold text-xs text-slate-300 bg-white/10 hover:bg-white/15 transition cursor-pointer">
+            Change Mode
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const canvas = document.getElementById('game-canvas');
+      const ctx = canvas.getContext('2d');
+
+      // DOM elements
+      const hudScore = document.getElementById('hud-score');
+      const hudBest = document.getElementById('hud-best');
+      const hudCombo = document.getElementById('hud-combo');
+      const hudComboWrap = document.getElementById('hud-combo-wrap');
+      const hudShields = document.getElementById('hud-shields');
+      const btnPhaseHud = document.getElementById('btn-phase-hud');
+      const btnMute = document.getElementById('btn-mute');
+      const iconSoundOn = document.getElementById('icon-sound-on');
+      const iconSoundOff = document.getElementById('icon-sound-off');
+      const btnPause = document.getElementById('btn-pause');
+      const touchControls = document.getElementById('touch-controls');
+      const btnTetherTouch = document.getElementById('btn-tether-touch');
+      const btnPhaseTouch = document.getElementById('btn-phase-touch');
+      const statusWave = document.getElementById('status-wave');
+      const statusGrazes = document.getElementById('status-grazes');
+
+      const overlayStart = document.getElementById('overlay-start');
+      const overlayPause = document.getElementById('overlay-pause');
+      const overlayGameover = document.getElementById('overlay-gameover');
+      const btnStart = document.getElementById('btn-start');
+      const btnResume = document.getElementById('btn-resume');
+      const btnRestartPause = document.getElementById('btn-restart-pause');
+      const btnReviveAd = document.getElementById('btn-revive-ad');
+      const overlayAd = document.getElementById('overlay-ad');
+      const adCountdown = document.getElementById('ad-countdown');
+      const btnAdClaim = document.getElementById('btn-ad-claim');
+      const btnPlayAgain = document.getElementById('btn-play-again');
+      const btnChangeMode = document.getElementById('btn-change-mode');
+      const diffButtons = document.querySelectorAll('.diff-btn');
+
+      const goRecordBadge = document.getElementById('gameover-record-badge');
+      const goReason = document.getElementById('gameover-reason');
+      const goScore = document.getElementById('go-score');
+      const goBest = document.getElementById('go-best');
+      const goShards = document.getElementById('go-shards');
+      const goGrazes = document.getElementById('go-grazes');
+
+      // Difficulty presets
+      const DIFFICULTIES = {
+        chill: { shields: 3, sweepSpeed: 42, hazardRate: 0.45, gravity: 90, speedScale: 0.88 },
+        arcade: { shields: 2, sweepSpeed: 64, hazardRate: 0.72, gravity: 115, speedScale: 1.0 },
+        hyper: { shields: 1, sweepSpeed: 88, hazardRate: 0.95, gravity: 140, speedScale: 1.18 }
+      };
+
+      // Storage helpers
+      const STORAGE_KEY = 'prism_paradox_best_v1';
+      function loadBestScore() {
+        try {
+          const val = localStorage.getItem(STORAGE_KEY);
+          return val ? parseInt(val, 10) || 0 : 0;
+        } catch (e) {
+          return 0;
+        }
+      }
+      function saveBestScore(val) {
+        try {
+          localStorage.setItem(STORAGE_KEY, String(val));
+        } catch (e) {}
+      }
+
+      // Web Audio Synthesizer
+      const Sound = {
+        ctx: null,
+        muted: false,
+        init() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              this.ctx = new AudioCtx();
+            }
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+        },
+        playTone(freq, type, duration, gainVal, slideTo) {
+          if (this.muted || !this.ctx) return;
+          try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, now);
+            if (slideTo) {
+              osc.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), now + duration);
+            }
+            gain.gain.setValueAtTime(gainVal, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration);
+          } catch (e) {}
+        },
+        tether() { this.playTone(320, 'sine', 0.11, 0.09, 540); },
+        release() { this.playTone(460, 'triangle', 0.12, 0.08, 280); },
+        phase(isSolar) {
+          if (isSolar) {
+            this.playTone(520, 'sine', 0.14, 0.1, 780);
+          } else {
+            this.playTone(680, 'sine', 0.14, 0.1, 420);
+          }
+        },
+        shard(combo) {
+          const base = 440 * Math.pow(1.06, Math.min(combo, 12));
+          this.playTone(base, 'triangle', 0.14, 0.1, base * 1.5);
+        },
+        graze() {
+          this.playTone(220, 'sawtooth', 0.22, 0.08, 660);
+        },
+        powerup() {
+          this.playTone(523, 'sine', 0.1, 0.1, 659);
+          setTimeout(() => this.playTone(784, 'sine', 0.18, 0.1, 1046), 70);
+        },
+        hit() {
+          this.playTone(170, 'sawtooth', 0.25, 0.14, 55);
+        },
+        gameover() {
+          this.playTone(260, 'sawtooth', 0.45, 0.14, 45);
+        }
+      };
+
+      // Game State
+      let width = 800;
+      let height = 600;
+      let dpr = 1;
+      let rafId = null;
+      let lastTime = 0;
+
+      const state = {
+        mode: 'start', // 'start' | 'playing' | 'paused' | 'gameover'
+        difficulty: 'arcade',
+        phase: 'solar', // 'solar' | 'void'
+        score: 0,
+        best: loadBestScore(),
+        combo: 1,
+        comboTimer: 0,
+        shardsCollected: 0,
+        grazes: 0,
+        wave: 1,
+        revivedThisRun: false,
+        shields: 2,
+        maxShields: 2,
+        invulnTimer: 0,
+        magnetTimer: 0,
+        hyperTimer: 0,
+        slowMoTimer: 0,
+        shakeTimer: 0,
+        cameraY: 0,
+        highestY: 0,
+        sweepY: 320,
+        nextSpawnY: 0,
+        isTethering: false,
+        tetherAnchor: null,
+        orbitAngle: 0,
+        orbitRadius: 90,
+        orbitDir: 1,
+        orbitSpeed: 3.4,
+        player: {
+          x: 400,
+          y: 300,
+          vx: 0,
+          vy: -220,
+          radius: 13,
+          trail: []
+        },
+        stars: [],
+        anchors: [],
+        shards: [],
+        hazards: [],
+        powerups: [],
+        particles: [],
+        ripples: [],
+        floatingTexts: []
+      };
+
+      // Resize canvas cleanly
+      function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        width = Math.max(320, rect.width);
+        height = Math.max(400, rect.height);
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        initStarfield();
+        if (state.mode === 'start') {
+          state.player.x = width * 0.5;
+          state.player.y = height * 0.55;
+        }
+      }
+
+      function initStarfield() {
+        state.stars = [];
+        const count = Math.floor((width * height) / 9000);
+        for (let i = 0; i < count; i++) {
+          state.stars.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            size: Math.random() * 1.8 + 0.5,
+            depth: Math.random() * 0.6 + 0.2,
+            alpha: Math.random() * 0.55 + 0.25
+          });
+        }
+      }
+
+      // HUD Updates
+      function updateHUD() {
+        hudScore.textContent = Math.floor(state.score).toLocaleString();
+        hudBest.textContent = Math.floor(state.best).toLocaleString();
+        hudCombo.textContent = 'x' + state.combo;
+        if (state.combo > 1) {
+          hudComboWrap.classList.remove('hidden');
+          hudComboWrap.classList.add('flex');
+        } else {
+          hudComboWrap.classList.add('hidden');
+          hudComboWrap.classList.remove('flex');
+        }
+
+        if (state.phase === 'solar') {
+          btnPhaseHud.textContent = 'SOLAR';
+          btnPhaseHud.className = 'phase-solar-badge rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold tracking-wide transition-all cursor-pointer';
+        } else {
+          btnPhaseHud.textContent = 'VOID';
+          btnPhaseHud.className = 'phase-void-badge rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold tracking-wide transition-all cursor-pointer';
+        }
+
+        hudShields.innerHTML = '';
+        for (let i = 0; i < state.maxShields; i++) {
+          const pip = document.createElement('span');
+          pip.className = i < state.shields
+            ? 'inline-block w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]'
+            : 'inline-block w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-white/15';
+          hudShields.appendChild(pip);
+        }
+
+        statusWave.textContent = 'Wave ' + state.wave;
+        statusGrazes.textContent = 'Grazes: ' + state.grazes;
+      }
+
+      // Procedural Spawner
+      function spawnRow(yPos) {
+        const cfg = DIFFICULTIES[state.difficulty];
+        const margin = 56;
+        const usableW = Math.max(120, width - margin * 2);
+
+        // Always spawn 1 or 2 Star Anchors so player always has a swing target
+        const anchorCount = Math.random() < 0.48 ? 2 : 1;
+        const anchorXs = [];
+        for (let i = 0; i < anchorCount; i++) {
+          let ax = margin + Math.random() * usableW;
+          if (anchorCount === 2 && i === 1) {
+            ax = anchorXs[0] < width / 2
+              ? width * 0.55 + Math.random() * (usableW * 0.4)
+              : margin + Math.random() * (usableW * 0.4);
+          }
+          anchorXs.push(ax);
+          const moving = state.wave >= 2 && Math.random() < 0.28;
+          state.anchors.push({
+            x: ax,
+            baseX: ax,
+            y: yPos,
+            radius: 10,
+            moving,
+            phaseOffset: Math.random() * Math.PI * 2,
+            moveAmp: 40 + Math.random() * 45
+          });
+        }
+
+        // Spawn Prism Shards (Phase-tagged or neutral)
+        if (Math.random() < 0.85) {
+          const shardPhase = Math.random() < 0.5 ? 'solar' : 'void';
+          const sx = margin + Math.random() * usableW;
+          const sy = yPos - 45 - Math.random() * 40;
+          state.shards.push({
+            x: sx,
+            y: sy,
+            phase: shardPhase,
+            radius: 10,
+            collected: false,
+            bobOffset: Math.random() * Math.PI * 2
+          });
+        }
+
+        // Spawn Hazards (Phase-locked Laser Gates or Rift Mines)
+        const waveFactor = Math.min(1.4, 0.75 + state.wave * 0.12);
+        if (yPos < -160 && Math.random() < cfg.hazardRate * waveFactor) {
+          const hPhase = Math.random() < 0.5 ? 'solar' : 'void';
+          if (Math.random() < 0.55) {
+            // Laser Gate
+            const gateW = Math.min(usableW * 0.55, 110 + Math.random() * 80);
+            const gx = margin + Math.random() * Math.max(20, usableW - gateW);
+            state.hazards.push({
+              type: 'laser',
+              x: gx,
+              y: yPos - 65,
+              w: gateW,
+              h: 10,
+              phase: hPhase,
+              grazed: false
+            });
+          } else {
+            // Rift Mine (drifting orb)
+            const mx = margin + Math.random() * usableW;
+            state.hazards.push({
+              type: 'mine',
+              x: mx,
+              baseX: mx,
+              y: yPos - 60,
+              radius: 16,
+              phase: hPhase,
+              grazed: false,
+              drift: state.wave >= 2,
+              driftOffset: Math.random() * Math.PI * 2
+            });
+          }
+        }
+
+        // Occasional Powerup
+        if (yPos < -300 && Math.random() < 0.14) {
+          const kinds = ['shield', 'magnet', 'hyper'];
+          const kind = kinds[Math.floor(Math.random() * kinds.length)];
+          state.powerups.push({
+            x: margin + Math.random() * usableW,
+            y: yPos - 80,
+            kind,
+            radius: 13,
+            collected: false
+          });
+        }
+      }
+
+      // Reset & Start Game
+      function startGame() {
+        Sound.init();
+        const cfg = DIFFICULTIES[state.difficulty];
+        state.mode = 'playing';
+        state.phase = 'solar';
+        state.score = 0;
+        state.combo = 1;
+        state.comboTimer = 0;
+        state.shardsCollected = 0;
+        state.grazes = 0;
+        state.wave = 1;
+        state.revivedThisRun = false;
+        state.shields = cfg.shields;
+        state.maxShields = cfg.shields;
+        state.invulnTimer = 1.0;
+        state.magnetTimer = 0;
+        state.hyperTimer = 0;
+        state.slowMoTimer = 0;
+        state.shakeTimer = 0;
+        state.isTethering = false;
+        state.tetherAnchor = null;
+
+        state.player = {
+          x: width * 0.5,
+          y: 0,
+          vx: (Math.random() - 0.5) * 80,
+          vy: -260,
+          radius: 13,
+          trail: []
+        };
+        state.cameraY = -height * 0.65;
+        state.highestY = 0;
+        state.sweepY = 260;
+
+        state.anchors = [];
+        state.shards = [];
+        state.hazards = [];
+        state.powerups = [];
+        state.particles = [];
+        state.ripples = [];
+        state.floatingTexts = [];
+
+        // Initial starter anchor right above player
+        state.anchors.push({
+          x: width * 0.5,
+          baseX: width * 0.5,
+          y: -140,
+          radius: 11,
+          moving: false,
+          phaseOffset: 0,
+          moveAmp: 0
+        });
+
+        state.nextSpawnY = -270;
+        while (state.nextSpawnY > -height * 1.6) {
+          spawnRow(state.nextSpawnY);
+          state.nextSpawnY -= 145 + Math.random() * 35;
+        }
+
+        overlayStart.classList.add('hidden');
+        overlayStart.classList.remove('flex');
+        overlayPause.classList.add('hidden');
+        overlayPause.classList.remove('flex');
+        overlayGameover.classList.add('hidden');
+        overlayGameover.classList.remove('flex');
+
+        btnPause.classList.remove('hidden');
+        touchControls.classList.remove('hidden');
+        touchControls.classList.add('flex');
+
+        updateHUD();
+      }
+
+      // Phase Flip
+      function flipPhase() {
+        if (state.mode !== 'playing') return;
+        Sound.init();
+        state.phase = state.phase === 'solar' ? 'void' : 'solar';
+        Sound.phase(state.phase === 'solar');
+
+        // Visual shockwave ripple
+        state.ripples.push({
+          x: state.player.x,
+          y: state.player.y,
+          radius: 14,
+          maxRadius: 150,
+          alpha: 0.85,
+          color: state.phase === 'solar' ? '#fbbf24' : '#22d3ee'
+        });
+
+        // Check Paradox Graze (flipping near an active hazard)
+        for (const h of state.hazards) {
+          if (h.grazed) continue;
+          const dist = Math.hypot(state.player.x - (h.type === 'laser' ? h.x + h.w / 2 : h.x), state.player.y - h.y);
+          if (dist < 115) {
+            h.grazed = true;
+            state.grazes += 1;
+            state.combo = Math.min(8, state.combo + 1);
+            state.comboTimer = 4.5;
+            state.score += 75 * state.combo;
+            state.slowMoTimer = 0.25;
+            Sound.graze();
+            addFloatingText(state.player.x, state.player.y - 24, 'PARADOX GRAZE +' + (75 * state.combo), '#f472b6');
+            break;
+          }
+        }
+
+        updateHUD();
+      }
+
+      // Start Tether
+      function startTether() {
+        if (state.mode !== 'playing' || state.isTethering) return;
+        Sound.init();
+
+        // Find best anchor within range
+        let best = null;
+        let bestScore = Infinity;
+        const maxRange = 300;
+
+        for (const a of state.anchors) {
+          const dx = a.x - state.player.x;
+          const dy = a.y - state.player.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < maxRange && dist > 18) {
+            // Slight preference for anchors above the player
+            const score = dist + (dy > 40 ? 90 : 0);
+            if (score < bestScore) {
+              bestScore = score;
+              best = a;
+            }
+          }
+        }
+
+        if (best) {
+          state.isTethering = true;
+          state.tetherAnchor = best;
+          const dx = state.player.x - best.x;
+          const dy = state.player.y - best.y;
+          state.orbitAngle = Math.atan2(dy, dx);
+          state.orbitRadius = Math.max(48, Math.min(200, Math.hypot(dx, dy)));
+
+          // Determine orbit direction from cross product of radius & velocity
+          const cross = dx * state.player.vy - dy * state.player.vx;
+          state.orbitDir = cross >= 0 ? 1 : -1;
+          const speed = Math.max(240, Math.hypot(state.player.vx, state.player.vy));
+          state.orbitSpeed = Math.min(5.2, Math.max(2.6, speed / state.orbitRadius));
+          Sound.tether();
+        } else {
+          // Micro-boost if no anchor nearby so input always feels responsive
+          state.player.vy = Math.min(state.player.vy, -240);
+          spawnParticles(state.player.x, state.player.y + 10, '#94a3b8', 6);
+        }
+      }
+
+      function releaseTether() {
+        if (!state.isTethering) return;
+        state.isTethering = false;
+        state.tetherAnchor = null;
+        // Give a crisp slingshot boost on release
+        const boost = 1.15;
+        state.player.vx *= boost;
+        state.player.vy *= boost;
+        if (state.player.vy > -180) {
+          state.player.vy -= 110;
+        }
+        Sound.release();
+      }
+
+      function spawnParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 50 + Math.random() * 190;
+          state.particles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.45 + Math.random() * 0.35,
+            maxLife: 0.8,
+            size: 2 + Math.random() * 3.5,
+            color
+          });
+        }
+      }
+
+      function addFloatingText(x, y, text, color) {
+        state.floatingTexts.push({
+          x,
+          y,
+          text,
+          color,
+          life: 1.0,
+          vy: -45
+        });
+      }
+
+      function damagePlayer(reason) {
+        if (state.invulnTimer > 0) return;
+        state.shields -= 1;
+        state.shakeTimer = 0.25;
+        state.combo = 1;
+        spawnParticles(state.player.x, state.player.y, '#fb7185', 18);
+
+        if (state.shields <= 0) {
+          triggerGameOver(reason);
+        } else {
+          state.invulnTimer = 1.4;
+          Sound.hit();
+          addFloatingText(state.player.x, state.player.y - 20, 'SHIELD HIT!', '#fb7185');
+          updateHUD();
+        }
+      }
+
+      function triggerGameOver(reason) {
+        state.mode = 'gameover';
+        state.isTethering = false;
+        state.tetherAnchor = null;
+        Sound.gameover();
+
+        const finalScore = Math.floor(state.score);
+        let isNewRecord = false;
+        if (finalScore > state.best) {
+          state.best = finalScore;
+          saveBestScore(finalScore);
+          isNewRecord = true;
+        }
+
+        goScore.textContent = finalScore.toLocaleString();
+        goBest.textContent = state.best.toLocaleString();
+        goShards.textContent = String(state.shardsCollected);
+        goGrazes.textContent = String(state.grazes);
+        goReason.textContent = reason;
+
+        if (isNewRecord) {
+          goRecordBadge.classList.remove('hidden');
+        } else {
+          goRecordBadge.classList.add('hidden');
+        }
+
+        if (state.revivedThisRun) {
+          btnReviveAd.classList.add('hidden');
+        } else {
+          btnReviveAd.classList.remove('hidden');
+        }
+        if (window.PrismAds && typeof window.PrismAds.onGameOver === 'function') {
+          window.PrismAds.onGameOver();
+        }
+        btnPause.classList.add('hidden');
+        touchControls.classList.add('hidden');
+        touchControls.classList.remove('flex');
+        overlayGameover.classList.remove('hidden');
+        overlayGameover.classList.add('flex');
+        updateHUD();
+      }
+
+      function togglePause() {
+        if (state.mode === 'playing') {
+          state.mode = 'paused';
+          state.isTethering = false;
+          state.tetherAnchor = null;
+          overlayPause.classList.remove('hidden');
+          overlayPause.classList.add('flex');
+        } else if (state.mode === 'paused') {
+          state.mode = 'playing';
+          lastTime = performance.now();
+          overlayPause.classList.add('hidden');
+          overlayPause.classList.remove('flex');
+        }
+      }
+
+      // Physics & Update Loop
+      function update(rawDt) {
+        if (state.mode !== 'playing') return;
+
+        const cfg = DIFFICULTIES[state.difficulty];
+        let dt = Math.min(rawDt, 0.04) * cfg.speedScale;
+        if (state.slowMoTimer > 0) {
+          state.slowMoTimer -= rawDt;
+          dt *= 0.42;
+        }
+
+        // Timers
+        if (state.invulnTimer > 0) state.invulnTimer -= rawDt;
+        if (state.magnetTimer > 0) state.magnetTimer -= rawDt;
+        if (state.hyperTimer > 0) state.hyperTimer -= rawDt;
+        if (state.shakeTimer > 0) state.shakeTimer -= rawDt;
+        if (state.comboTimer > 0) {
+          state.comboTimer -= rawDt;
+          if (state.comboTimer <= 0) {
+            state.combo = 1;
+          }
+        }
+
+        const p = state.player;
+        const timeSec = performance.now() * 0.001;
+
+        // Update moving anchors
+        for (const a of state.anchors) {
+          if (a.moving) {
+            a.x = a.baseX + Math.sin(timeSec * 1.8 + a.phaseOffset) * a.moveAmp;
+          }
+        }
+
+        // Player movement
+        if (state.isTethering && state.tetherAnchor) {
+          const a = state.tetherAnchor;
+          state.orbitAngle += state.orbitDir * state.orbitSpeed * dt;
+          // Gently tighten orbit slightly for snappy feel
+          state.orbitRadius = Math.max(48, state.orbitRadius - 12 * dt);
+
+          const prevX = p.x;
+          const prevY = p.y;
+          p.x = a.x + Math.cos(state.orbitAngle) * state.orbitRadius;
+          p.y = a.y + Math.sin(state.orbitAngle) * state.orbitRadius;
+
+          p.vx = (p.x - prevX) / Math.max(dt, 0.001);
+          p.vy = (p.y - prevY) / Math.max(dt, 0.001);
+        } else {
+          p.vy += cfg.gravity * dt;
+          // Clamp max velocity
+          const maxV = 540;
+          const spd = Math.hypot(p.vx, p.vy);
+          if (spd > maxV) {
+            p.vx = (p.vx / spd) * maxV;
+            p.vy = (p.vy / spd) * maxV;
+          }
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+        }
+
+        // Side wall bounce
+        if (p.x < p.radius + 8) {
+          p.x = p.radius + 8;
+          p.vx = Math.abs(p.vx) * 0.85;
+          spawnParticles(p.x, p.y, '#64748b', 4);
+        } else if (p.x > width - p.radius - 8) {
+          p.x = width - p.radius - 8;
+          p.vx = -Math.abs(p.vx) * 0.85;
+          spawnParticles(p.x, p.y, '#64748b', 4);
+        }
+
+        // Player trail
+        p.trail.push({ x: p.x, y: p.y, phase: state.phase });
+        if (p.trail.length > 20) p.trail.shift();
+
+        // Altitude score & camera follow
+        if (p.y < state.highestY) {
+          const gained = (state.highestY - p.y) * 0.12;
+          state.score += gained * state.combo;
+          state.highestY = p.y;
+        }
+
+        const targetCamY = p.y - height * 0.56;
+        if (targetCamY < state.cameraY) {
+          state.cameraY += (targetCamY - state.cameraY) * Math.min(1, dt * 8);
+        }
+
+        // Wave progression
+        const newWave = 1 + Math.floor(Math.abs(state.highestY) / 1400);
+        if (newWave > state.wave) {
+          state.wave = newWave;
+          addFloatingText(p.x, p.y - 35, 'WAVE ' + state.wave, '#38bdf8');
+        }
+
+        // Entropy Sweep rises from below
+        const sweepAccel = 1 + (state.wave - 1) * 0.08;
+        state.sweepY -= cfg.sweepSpeed * sweepAccel * dt;
+        const maxSweepDist = state.cameraY + height + 110;
+        if (state.sweepY > maxSweepDist) {
+          state.sweepY = maxSweepDist;
+        }
+        if (p.y + p.radius > state.sweepY) {
+          triggerGameOver('Consumed by the rising Entropy Sweep.');
+          return;
+        }
+
+        // Spawn ahead of camera
+        while (state.nextSpawnY > state.cameraY - height * 0.9) {
+          spawnRow(state.nextSpawnY);
+          state.nextSpawnY -= 140 + Math.random() * 40;
+        }
+
+        // Collect Shards
+        for (const s of state.shards) {
+          if (s.collected) continue;
+          const active = s.phase === state.phase || state.hyperTimer > 0;
+          if (state.magnetTimer > 0) {
+            const dx = p.x - s.x;
+            const dy = p.y - s.y;
+            const d = Math.hypot(dx, dy);
+            if (d < 220 && d > 1) {
+              s.x += (dx / d) * 320 * dt;
+              s.y += (dy / d) * 320 * dt;
+            }
+          }
+          const dist = Math.hypot(p.x - s.x, p.y - s.y);
+          if (active && dist < p.radius + s.radius + 6) {
+            s.collected = true;
+            state.shardsCollected += 1;
+            state.combo = Math.min(8, state.combo + 1);
+            state.comboTimer = 4.2;
+            const pts = 50 * state.combo;
+            state.score += pts;
+            Sound.shard(state.combo);
+            spawnParticles(s.x, s.y, s.phase === 'solar' ? '#fbbf24' : '#22d3ee', 12);
+            addFloatingText(s.x, s.y - 10, '+' + pts, s.phase === 'solar' ? '#fde68a' : '#a5f3fc');
+          }
+        }
+
+        // Collect Powerups
+        for (const pw of state.powerups) {
+          if (pw.collected) continue;
+          const dist = Math.hypot(p.x - pw.x, p.y - pw.y);
+          if (dist < p.radius + pw.radius + 4) {
+            pw.collected = true;
+            Sound.powerup();
+            if (pw.kind === 'shield') {
+              state.shields = Math.min(state.maxShields, state.shields + 1);
+              addFloatingText(pw.x, pw.y, '+1 SHIELD', '#34d399');
+            } else if (pw.kind === 'magnet') {
+              state.magnetTimer = 6.5;
+              addFloatingText(pw.x, pw.y, 'SHARD MAGNET', '#a78bfa');
+            } else {
+              state.hyperTimer = 5.0;
+              addFloatingText(pw.x, pw.y, 'HYPERNOVA!', '#f472b6');
+            }
+            spawnParticles(pw.x, pw.y, '#e879f9', 14);
+          }
+        }
+
+        // Hazard collisions (only active when phase matches!)
+        for (const h of state.hazards) {
+          if (h.type === 'mine' && h.drift) {
+            h.x = h.baseX + Math.sin(timeSec * 2.1 + h.driftOffset) * 55;
+          }
+          const isSolid = h.phase === state.phase;
+          if (!isSolid) continue;
+
+          let hit = false;
+          if (h.type === 'laser') {
+            const closestX = Math.max(h.x, Math.min(p.x, h.x + h.w));
+            const closestY = Math.max(h.y - h.h / 2, Math.min(p.y, h.y + h.h / 2));
+            if (Math.hypot(p.x - closestX, p.y - closestY) < p.radius - 2) {
+              hit = true;
+            }
+          } else {
+            if (Math.hypot(p.x - h.x, p.y - h.y) < p.radius + h.radius - 3) {
+              hit = true;
+            }
+          }
+
+          if (hit) {
+            if (state.hyperTimer > 0) {
+              h.phase = 'destroyed';
+              state.score += 100;
+              spawnParticles(p.x, p.y, '#f472b6', 16);
+              addFloatingText(p.x, p.y - 16, 'SMASH +100', '#f472b6');
+            } else {
+              damagePlayer('Collided with an active ' + h.phase.toUpperCase() + ' hazard.');
+              if (state.mode !== 'playing') return;
+            }
+          }
+        }
+
+        // Cleanup entities far below sweep
+        const cullY = state.sweepY + 250;
+        state.anchors = state.anchors.filter(a => a.y < cullY);
+        state.shards = state.shards.filter(s => !s.collected && s.y < cullY);
+        state.hazards = state.hazards.filter(h => h.phase !== 'destroyed' && h.y < cullY);
+        state.powerups = state.powerups.filter(pw => !pw.collected && pw.y < cullY);
+
+        // Update particles, ripples, floating texts
+        for (const pt of state.particles) {
+          pt.x += pt.vx * dt;
+          pt.y += pt.vy * dt;
+          pt.life -= rawDt;
+        }
+        state.particles = state.particles.filter(pt => pt.life > 0);
+
+        for (const rp of state.ripples) {
+          rp.radius += (rp.maxRadius - rp.radius) * Math.min(1, rawDt * 8);
+          rp.alpha -= rawDt * 2.1;
+        }
+        state.ripples = state.ripples.filter(rp => rp.alpha > 0.02);
+
+        for (const ft of state.floatingTexts) {
+          ft.y += ft.vy * rawDt;
+          ft.life -= rawDt * 1.1;
+        }
+        state.floatingTexts = state.floatingTexts.filter(ft => ft.life > 0);
+
+        updateHUD();
+      }
+
+      // Render Loop
+      function render() {
+        const isSolar = state.phase === 'solar';
+        // Background gradient
+        const grad = ctx.createLinearGradient(0, 0, 0, height);
+        if (isSolar) {
+          grad.addColorStop(0, '#120818');
+          grad.addColorStop(1, '#1e0f18');
+        } else {
+          grad.addColorStop(0, '#050b1a');
+          grad.addColorStop(1, '#0c1328');
+        }
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Parallax starfield
+        for (const st of state.stars) {
+          const sy = ((st.y - state.cameraY * st.depth) % height + height) % height;
+          ctx.fillStyle = `rgba(226, 232, 240, ${st.alpha})`;
+          ctx.beginPath();
+          ctx.arc(st.x, sy, st.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.save();
+        if (state.shakeTimer > 0) {
+          const mag = state.shakeTimer * 24;
+          ctx.translate((Math.random() - 0.5) * mag, (Math.random() - 0.5) * mag);
+        }
+        ctx.translate(0, -state.cameraY);
+
+        const timeSec = performance.now() * 0.001;
+
+        // Draw Tether Line
+        if (state.isTethering && state.tetherAnchor) {
+          ctx.strokeStyle = isSolar ? 'rgba(251, 191, 36, 0.85)' : 'rgba(34, 211, 238, 0.85)';
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([6, 4]);
+          ctx.beginPath();
+          ctx.moveTo(state.player.x, state.player.y);
+          ctx.lineTo(state.tetherAnchor.x, state.tetherAnchor.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Draw Anchors
+        for (const a of state.anchors) {
+          const isLocked = state.tetherAnchor === a;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, a.radius + 8, 0, Math.PI * 2);
+          ctx.strokeStyle = isLocked ? 'rgba(255,255,255,0.7)' : 'rgba(148, 163, 184, 0.25)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, a.radius, 0, Math.PI * 2);
+          ctx.fillStyle = isLocked ? '#ffffff' : '#cbd5e1';
+          ctx.shadowColor = isLocked ? '#ffffff' : '#94a3b8';
+          ctx.shadowBlur = isLocked ? 18 : 10;
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Draw Shards
+        for (const s of state.shards) {
+          const active = s.phase === state.phase || state.hyperTimer > 0;
+          const color = s.phase === 'solar' ? '#fbbf24' : '#22d3ee';
+          const bobY = s.y + Math.sin(timeSec * 3.5 + s.bobOffset) * 4;
+          ctx.save();
+          ctx.globalAlpha = active ? 1 : 0.25;
+          ctx.translate(s.x, bobY);
+          ctx.rotate(timeSec * 2 + s.bobOffset);
+          ctx.fillStyle = color;
+          if (active) {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 14;
+          }
+          ctx.beginPath();
+          ctx.moveTo(0, -s.radius);
+          ctx.lineTo(s.radius * 0.75, 0);
+          ctx.lineTo(0, s.radius);
+          ctx.lineTo(-s.radius * 0.75, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Draw Powerups
+        for (const pw of state.powerups) {
+          const col = pw.kind === 'shield' ? '#34d399' : pw.kind === 'magnet' ? '#a78bfa' : '#f472b6';
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(pw.x, pw.y, pw.radius, 0, Math.PI * 2);
+          ctx.fillStyle = col;
+          ctx.shadowColor = col;
+          ctx.shadowBlur = 16;
+          ctx.fill();
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 11px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(pw.kind === 'shield' ? 'S' : pw.kind === 'magnet' ? 'M' : 'H', pw.x, pw.y + 0.5);
+          ctx.restore();
+        }
+
+        // Draw Hazards
+        for (const h of state.hazards) {
+          const solid = h.phase === state.phase;
+          const col = h.phase === 'solar' ? '#f59e0b' : '#06b6d4';
+          ctx.save();
+          ctx.globalAlpha = solid ? 0.95 : 0.22;
+          if (solid) {
+            ctx.shadowColor = col;
+            ctx.shadowBlur = 14;
+          } else {
+            ctx.setLineDash([5, 5]);
+          }
+
+          if (h.type === 'laser') {
+            ctx.fillStyle = solid ? col : 'transparent';
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 2;
+            const rx = h.x, ry = h.y - h.h / 2, rw = h.w, rh = h.h, rr = 5;
+            ctx.beginPath();
+            ctx.moveTo(rx + rr, ry);
+            ctx.lineTo(rx + rw - rr, ry);
+            ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + rr);
+            ctx.lineTo(rx + rw, ry + rh - rr);
+            ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - rr, ry + rh);
+            ctx.lineTo(rx + rr, ry + rh);
+            ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - rr);
+            ctx.lineTo(rx, ry + rr);
+            ctx.quadraticCurveTo(rx, ry, rx + rr, ry);
+            ctx.closePath();
+            if (solid) ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.beginPath();
+            ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2);
+            ctx.fillStyle = solid ? col : 'transparent';
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 2.5;
+            if (solid) ctx.fill();
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        // Draw Entropy Sweep
+        if (state.mode !== 'start') {
+          const sweepGrad = ctx.createLinearGradient(0, state.sweepY - 24, 0, state.sweepY + 60);
+          sweepGrad.addColorStop(0, 'rgba(244, 63, 94, 0)');
+          sweepGrad.addColorStop(0.4, 'rgba(244, 63, 94, 0.75)');
+          sweepGrad.addColorStop(1, 'rgba(136, 19, 55, 0.95)');
+          ctx.fillStyle = sweepGrad;
+          ctx.fillRect(0, state.sweepY - 24, width, 160);
+
+          ctx.strokeStyle = '#fda4af';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, state.sweepY);
+          ctx.lineTo(width, state.sweepY);
+          ctx.stroke();
+        }
+
+        // Draw Ripples
+        for (const rp of state.ripples) {
+          ctx.save();
+          ctx.globalAlpha = rp.alpha;
+          ctx.strokeStyle = rp.color;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(rp.x, rp.y, rp.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Draw Player Trail
+        const trail = state.player.trail;
+        for (let i = 0; i < trail.length; i++) {
+          const t = trail[i];
+          const ratio = (i + 1) / trail.length;
+          ctx.fillStyle = t.phase === 'solar'
+            ? `rgba(251, 191, 36, ${ratio * 0.45})`
+            : `rgba(34, 211, 238, ${ratio * 0.45})`;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, state.player.radius * ratio * 0.85, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Draw Player Core
+        if (state.mode !== 'start') {
+          const p = state.player;
+          const blink = state.invulnTimer > 0 && Math.floor(timeSec * 16) % 2 === 0;
+          if (!blink) {
+            ctx.save();
+            const coreColor = state.hyperTimer > 0 ? '#f472b6' : (isSolar ? '#fbbf24' : '#22d3ee');
+            ctx.shadowColor = coreColor;
+            ctx.shadowBlur = 22;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = coreColor;
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius + 4, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        // Draw Particles
+        for (const pt of state.particles) {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+          ctx.fillStyle = pt.color;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Draw Floating Texts
+        for (const ft of state.floatingTexts) {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, ft.life);
+          ctx.fillStyle = ft.color;
+          ctx.font = '800 13px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(ft.text, ft.x, ft.y);
+          ctx.restore();
+        }
+
+        ctx.restore();
+      }
+
+      function loop(now) {
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
+        update(dt);
+        render();
+        rafId = requestAnimationFrame(loop);
+      }
+
+      // Event Listeners
+      window.addEventListener('resize', resizeCanvas);
+
+      diffButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.difficulty = btn.dataset.diff;
+          diffButtons.forEach(b => {
+            if (b === btn) {
+              b.className = 'diff-btn rounded-xl py-2 px-2 text-xs font-bold border border-cyan-400/70 bg-cyan-500/20 text-white transition cursor-pointer';
+            } else {
+              b.className = 'diff-btn rounded-xl py-2 px-2 text-xs font-bold border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 transition cursor-pointer';
+            }
+          });
+        });
+      });
+
+      btnStart.addEventListener('click', startGame);
+      let adTimerId = null;
+      function revivePlayer() {
+        state.revivedThisRun = true;
+        state.mode = 'playing';
+        state.shields = 1;
+        state.invulnTimer = 2.5;
+        state.isTethering = false;
+        state.tetherAnchor = null;
+        state.player.vy = -240;
+        state.sweepY = Math.max(state.sweepY, state.player.y + 220);
+        overlayGameover.classList.add('hidden');
+        overlayGameover.classList.remove('flex');
+        overlayAd.classList.add('hidden');
+        overlayAd.classList.remove('flex');
+        btnPause.classList.remove('hidden');
+        touchControls.classList.remove('hidden');
+        touchControls.classList.add('flex');
+        lastTime = performance.now();
+        updateHUD();
+        addFloatingText(state.player.x, state.player.y - 24, 'REVIVED!', '#34d399');
+      }
+
+      btnReviveAd.addEventListener('click', () => {
+        if (state.revivedThisRun) return;
+        if (window.PrismAds && typeof window.PrismAds.showRewarded === 'function') {
+          window.PrismAds.showRewarded(revivePlayer);
+          return;
+        }
+        // Browser preview simulation
+        overlayAd.classList.remove('hidden');
+        overlayAd.classList.add('flex');
+        let sec = 5;
+        adCountdown.textContent = String(sec);
+        btnAdClaim.disabled = true;
+        btnAdClaim.textContent = 'Please wait...';
+        btnAdClaim.className = 'w-full py-3 rounded-xl font-bold text-sm bg-emerald-500/30 text-emerald-200 cursor-not-allowed transition';
+        if (adTimerId) clearInterval(adTimerId);
+        adTimerId = setInterval(() => {
+          sec -= 1;
+          adCountdown.textContent = String(Math.max(0, sec));
+          if (sec <= 0) {
+            clearInterval(adTimerId);
+            adTimerId = null;
+            btnAdClaim.disabled = false;
+            btnAdClaim.textContent = 'Claim +1 Shield & Resume';
+            btnAdClaim.className = 'w-full py-3 rounded-xl font-extrabold text-sm bg-emerald-400 text-slate-950 hover:brightness-110 cursor-pointer transition';
+          }
+        }, 1000);
+      });
+
+      btnAdClaim.addEventListener('click', () => {
+        if (!btnAdClaim.disabled) revivePlayer();
+      });
+
+      btnPlayAgain.addEventListener('click', startGame);
+      btnRestartPause.addEventListener('click', startGame);
+      btnResume.addEventListener('click', togglePause);
+      btnPause.addEventListener('click', togglePause);
+      btnPhaseHud.addEventListener('click', flipPhase);
+
+      btnChangeMode.addEventListener('click', () => {
+        overlayGameover.classList.add('hidden');
+        overlayGameover.classList.remove('flex');
+        overlayStart.classList.remove('hidden');
+        overlayStart.classList.add('flex');
+        state.mode = 'start';
+      });
+
+      btnMute.addEventListener('click', () => {
+        Sound.muted = !Sound.muted;
+        if (Sound.muted) {
+          iconSoundOn.classList.add('hidden');
+          iconSoundOff.classList.remove('hidden');
+        } else {
+          iconSoundOn.classList.remove('hidden');
+          iconSoundOff.classList.add('hidden');
+          Sound.init();
+        }
+      });
+
+      // Keyboard controls
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+          if (state.mode === 'playing') {
+            e.preventDefault();
+            if (!e.repeat) startTether();
+          }
+        } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyF') {
+          if (state.mode === 'playing' && !e.repeat) {
+            e.preventDefault();
+            flipPhase();
+          }
+        } else if (e.code === 'KeyP' || e.code === 'Escape') {
+          if (state.mode === 'playing' || state.mode === 'paused') {
+            e.preventDefault();
+            togglePause();
+          }
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+          releaseTether();
+        }
+      });
+
+      // Canvas mouse/touch controls
+      canvas.addEventListener('pointerdown', (e) => {
+        if (state.mode !== 'playing') return;
+        if (e.button === 2) {
+          flipPhase();
+        } else {
+          startTether();
+        }
+      });
+      window.addEventListener('pointerup', () => {
+        releaseTether();
+      });
+      canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+      });
+
+      // On-screen touch buttons
+      btnTetherTouch.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startTether();
+      });
+      btnTetherTouch.addEventListener('pointerup', (e) => {
+        e.preventDefault();
+        releaseTether();
+      });
+      btnPhaseTouch.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        flipPhase();
+      });
+
+      let initialized = false;
+      function initGameApp() {
+        if (initialized) return;
+        initialized = true;
+        resizeCanvas();
+        updateHUD();
+        lastTime = performance.now();
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(loop);
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initGameApp);
+      } else {
+        initGameApp();
+      }
+      window.addEventListener('load', initGameApp);
+    })();
+  </script>
+</body>
+</html>
